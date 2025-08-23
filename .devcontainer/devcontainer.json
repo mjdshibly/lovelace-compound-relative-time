@@ -1,0 +1,40 @@
+// See https://aka.ms/vscode-remote/devcontainer.json for format details.
+{
+  "name": "Boilerplate Card Development",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "context": "..",
+  "appPort": ["5000:5000", "9123:8123"],
+  "postCreateCommand": "npm install",
+  "runArgs": [
+    "-v",
+    "${env:HOME}${env:USERPROFILE}/.ssh:/tmp/.ssh"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bierner.lit-html",
+        "runem.lit-plugin",
+        "davidanson.vscode-markdownlint",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "files.eol": "\n",
+        "editor.tabSize": 4,
+        "editor.formatOnPaste": false,
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "files.trimTrailingWhitespace": true
+      }
+    }
+  }
+}
