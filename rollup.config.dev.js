@@ -8,6 +8,25 @@ import ignore from './rollup-plugins/ignore';
 import { ignoreTextfieldFiles } from './elements/ignore/textfield';
 import { ignoreSelectFiles } from './elements/ignore/select';
 import { ignoreSwitchFiles } from './elements/ignore/switch';
+import { exec } from 'child_process';
+
+function scpAfterBuild() {
+  return {
+    name: 'scp-after-build',
+    writeBundle() {
+      const localFile = './dist/compound-relative-time.js';
+      const remotePath = '/root/homeassistant/www/compound-relative-time.js';
+      const scpCmd = `scp ${localFile} ha:${remotePath}`;
+      exec(scpCmd, (err, stdout, stderr) => {
+        if (err) {
+          console.error('SCP failed:', stderr);
+        } else {
+          console.log('File successfully copied via SCP!');
+        }
+      });
+    }
+  };
+}
 
 export default {
   input: ['src/compound-relative-time.ts'],
@@ -30,10 +49,11 @@ export default {
       allowCrossOrigin: true,
       headers: {
         'Access-Control-Allow-Origin': '*',
-      },
+      }
     }),
     ignore({
       files: [...ignoreTextfieldFiles, ...ignoreSelectFiles, ...ignoreSwitchFiles].map((file) => require.resolve(file)),
     }),
+    scpAfterBuild(),
   ],
 };
