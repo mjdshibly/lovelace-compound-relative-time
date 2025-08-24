@@ -1,12 +1,16 @@
+import { HomeAssistant } from 'custom-card-helpers';
 import { LitElement, html, css } from 'lit';
-import { property, customElement } from 'lit/decorators.js';
+import { property, customElement, state } from 'lit/decorators.js';
 
 @customElement('compound-relative-time')
 export class CompoundRelativeTime extends LitElement {
   @property({ type: String }) datetime = '';
   @property({ type: String }) locale = 'en';
+  @state() private hass!: HomeAssistant;
 
   private timer?: number;
+  private entityId?: string;
+  private _lastHtml?: unknown = undefined;
 
   static styles = css`
     :host {
@@ -27,26 +31,71 @@ export class CompoundRelativeTime extends LitElement {
 
   render() {
     const now = new Date();
+
+    if (this.hass && this.entityId && this.hass.states[this.entityId]) {
+      this.datetime = this.hass.states[this.entityId].state;
+    }
+
+    if (!this.datetime) {
+      this._lastHtml = html`<span>No datetime provided</span>`;
+      return this._lastHtml;
+    }
+
     const target = new Date(this.datetime);
     const diffMs = target.getTime() - now.getTime();
     const tense = diffMs < 0 ? 'past' : 'future';
     const absMs = Math.abs(diffMs);
     const duration = this.msToDuration(absMs);
     const formatted = formatWithContext(duration, this.locale, tense);
-    return html`${formatted}`;
+    this._lastHtml = html`${formatted}`;
+
+    return this._lastHtml;
   }
 
   msToDuration(ms: number) {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
+
+    const remainingDays = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    const remainingMinutes = minutes % 60;
+    const remainingSeconds = seconds % 60;
+    const units = [remainingDays, remainingHours, remainingMinutes, remainingSeconds];
+
+    // Make sure that only the two most significant non-zero units are shown because, for example,
+    // minutes and seconds do not add much value when days and hours are present, etc.
+    // E.g. "1 day and 3 hours", "2 hours and 15 minutes", "5 minutes and 30 seconds"
+
+    let indexOfThirdNonZero = 0;
+    for (let i = 0, count = 0; i < units.length; i++) {
+      if (units[i] !== 0) {
+        count++;
+        if (count === 3) {
+          indexOfThirdNonZero = i;
+          break;
+        }
+      }
+    }
+
+    for (let i = indexOfThirdNonZero; i < units.length; i++) {
+      units[i] = 0;
+    }
+
     return {
-      days,
-      hours: hours % 24,
-      minutes: minutes % 60,
-      seconds: seconds % 60
+      days: units[0],
+      hours: units[1],
+      minutes: units[2],
+      seconds: units[3]
     };
+  }
+
+  setConfig(config) {
+    console.log("Condddfig set:", config);
+    if (!config.entity) {
+      throw new Error('You need to define an entity');
+    }
+    this.entityId = config.entity;
   }
 }
 
@@ -120,9 +169,9 @@ function getArabicUnit(unit, value) {
 function formatWithContext(duration, locale = 'en', tense = 'past') {
   const phrase = formatCompoundDuration(duration, locale);
   if (locale === 'en') {
-    return tense === 'past' ? `${phrase} ago` : `in ${phrase}`;
+    return tense === 'past' ? `${phrase} ago` : `In ${phrase}`;
   } else if (locale === 'nl') {
-    return tense === 'past' ? `${phrase} geleden` : `over ${phrase}`;
+    return tense === 'past' ? `${phrase} geleden` : `Over ${phrase}`;
   } else if (locale === 'ar') {
     return tense === 'past' ? `منذ ${phrase}` : `بعد ${phrase}`;
   }
