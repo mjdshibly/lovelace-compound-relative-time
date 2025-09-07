@@ -1,56 +1,154 @@
 import { HomeAssistant } from 'custom-card-helpers';
 import { LitElement, html, css } from 'lit';
 import { property, customElement, state } from 'lit/decorators.js';
+import { BoilerplateCardConfig } from './types';
 
 @customElement('compound-relative-time')
 export class CompoundRelativeTime extends LitElement {
   @property({ type: String }) datetime = '';
   @property({ type: String }) locale = 'en';
+  @property({ type: String }) icon = '';
+  @property({ type: String }) name = '';
   @state() private hass!: HomeAssistant;
 
   private timer?: number;
   private entityId?: string;
-  private _lastHtml?: unknown = undefined;
+  private _config?: BoilerplateCardConfig;
 
-  static styles = css`
-    :host {
-      display: inline;
-      font-family: sans-serif;
+  static styles = [
+    css`
+      :host {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 400px;
+        margin: var(--tile-card-margin);
+      }
+      ha-card {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        box-sizing: border-box;
+        background: var(--card-background-color, white);
+        color: var(--primary-text-color, #212121);
+        border-radius: var(--ha-card-border-radius, 12px);
+        box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,0.1));
+        width: 100%;
+      }
+      .tile-row {
+        display: flex;
+        align-items: center;
+      }
+      .tile-icon {
+        font-size: 14px;
+        margin-right: 16px;
+        color: var(--state-icon-color, #44739e);
+        flex-shrink: 0;
+      }
+      .tile-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex: 1;
+      }
+      .tile-title {
+        font-size: 1.1em;
+        font-weight: 500;
+        line-height: 1.2;
+      }
+      .tile-content {
+        font-size: 0.9em;
+        line-height: 1.2;
+        word-break: break-word;
+      }
+      .warning {
+        color: var(--error-color, #b71c1c);
+        font-size: 1em;
+        margin-top: 8px;
+      }
+    `
+  ];
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: 'entity', selector: { entity: {} }, required: true },
+        { name: 'name', selector: { text: {} } },
+        { name: 'icon', selector: { icon: {} } },
+        { name: 'locale', selector: { text: {} } },
+      ]
     }
-  `;
+  }
+
+  setConfig(config: BoilerplateCardConfig) {
+    if (!config.entity) {
+      throw new Error('You need to define an entity');
+    }
+
+    this._config = config;
+    this.entityId = config.entity;
+    this.icon = config.icon ?? '';
+    this.name = config.name ?? '';
+  }
+
+  public getGridOptions() {
+    return {
+      min_columns: 6,
+      min_rows: 1,
+      columns: 6,
+      rows: 1,
+    };
+  }
+
+  render() {
+    if (!this._config || !this.entityId) {
+      return html`<ha-card><div class="warning">No entity configured</div></ha-card>`;
+    }
+
+    const now = new Date();
+    let valueHtml;
+    let iconToShow = this.icon;
+    let nameToShow = this.name;
+    let entityState;
+    let entityIcon;
+    let entityName;
+
+    if (this.hass && this.entityId && this.hass.states[this.entityId]) {
+      entityState = this.hass.states[this.entityId];
+      this.datetime = entityState.state;
+      entityIcon = entityState.attributes.icon;
+      entityName = entityState.attributes.friendly_name;
+      if (!iconToShow && entityIcon) iconToShow = entityIcon;
+      if (!nameToShow && entityName) nameToShow = entityName;
+    }
+
+    if (!this.datetime) {
+      valueHtml = html`<span>No datetime provided</span>`;
+    } else {
+      valueHtml = html`<span title="${this.datetime}">${createFormattedTimeString(now, new Date(this.datetime), this.locale)}</span>`;
+    }
+
+    return html`
+      <ha-card>
+        <div class="tile-row">
+          <ha-icon class="tile-icon" .icon="${iconToShow || 'mdi:clock-outline'}"></ha-icon>
+          <div class="tile-text">
+            <span class="tile-title">${nameToShow || 'Relative Time'}</span>
+            <span class="tile-content">${valueHtml}</span>
+          </div>
+        </div>
+      </ha-card>
+    `;
+  }
 
   connectedCallback() {
     super.connectedCallback();
-    // this.timer = window.setInterval(() => this.requestUpdate(), 30000); // update every minute
+    // this.timer = window.setInterval(() => this.requestUpdate(), 10000); // update every minute
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    if (this.timer) clearInterval(this.timer);
-  }
-
-  render() {
-    const now = new Date();
-
-    if (this.hass && this.entityId && this.hass.states[this.entityId]) {
-      this.datetime = this.hass.states[this.entityId].state;
-    }
-
-    if (!this.datetime) {
-      this._lastHtml = html`<span>No datetime provided</span>`;
-      return this._lastHtml;
-    } else {
-      this._lastHtml = html`<span title="${this.datetime}">${createFormattedTimeString(now, new Date(this.datetime), this.locale)}</span>`;
-      return this._lastHtml;
-    }
-  }
-
-  setConfig(config) {
-    console.log("Config set:", config);
-    if (!config.entity) {
-      throw new Error('You need to define an entity');
-    }
-    this.entityId = config.entity;
+    // if (this.timer) clearInterval(this.timer);
   }
 }
 
@@ -91,10 +189,10 @@ function getLocalizedUnit(unit, value, locale) {
 
   const labels = {
     en: {
-      days: ['day', 'days'],
-      hours: ['hour', 'hours'],
-      minutes: ['minute', 'minutes'],
-      seconds: ['second', 'seconds']
+      days: ['d', 'd'],
+      hours: ['h', 'h'],
+      minutes: ['m', 'm'],
+      seconds: ['s', 's']
     },
     nl: {
       days: ['dag', 'dagen'],
