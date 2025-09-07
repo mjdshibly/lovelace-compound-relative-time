@@ -21,7 +21,7 @@ export class CompoundRelativeTime extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.timer = window.setInterval(() => this.requestUpdate(), 60000); // update every minute
+    // this.timer = window.setInterval(() => this.requestUpdate(), 30000); // update every minute
   }
 
   disconnectedCallback() {
@@ -39,59 +39,14 @@ export class CompoundRelativeTime extends LitElement {
     if (!this.datetime) {
       this._lastHtml = html`<span>No datetime provided</span>`;
       return this._lastHtml;
+    } else {
+      this._lastHtml = html`<span title="${this.datetime}">${createFormattedTimeString(now, new Date(this.datetime), this.locale)}</span>`;
+      return this._lastHtml;
     }
-
-    const target = new Date(this.datetime);
-    const diffMs = target.getTime() - now.getTime();
-    const tense = diffMs < 0 ? 'past' : 'future';
-    const absMs = Math.abs(diffMs);
-    const duration = this.msToDuration(absMs);
-    const formatted = formatWithContext(duration, this.locale, tense);
-    this._lastHtml = html`${formatted}`;
-
-    return this._lastHtml;
-  }
-
-  msToDuration(ms: number) {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    const remainingDays = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    const remainingMinutes = minutes % 60;
-    const remainingSeconds = seconds % 60;
-    const units = [remainingDays, remainingHours, remainingMinutes, remainingSeconds];
-
-    // Make sure that only the two most significant non-zero units are shown because, for example,
-    // minutes and seconds do not add much value when days and hours are present, etc.
-    // E.g. "1 day and 3 hours", "2 hours and 15 minutes", "5 minutes and 30 seconds"
-
-    let indexOfThirdNonZero = 0;
-    for (let i = 0, count = 0; i < units.length; i++) {
-      if (units[i] !== 0) {
-        count++;
-        if (count === 3) {
-          indexOfThirdNonZero = i;
-          break;
-        }
-      }
-    }
-
-    for (let i = indexOfThirdNonZero; i < units.length; i++) {
-      units[i] = 0;
-    }
-
-    return {
-      days: units[0],
-      hours: units[1],
-      minutes: units[2],
-      seconds: units[3]
-    };
   }
 
   setConfig(config) {
-    console.log("Condddfig set:", config);
+    console.log("Config set:", config);
     if (!config.entity) {
       throw new Error('You need to define an entity');
     }
@@ -177,6 +132,80 @@ function formatWithContext(duration, locale = 'en', tense = 'past') {
   }
   return phrase;
 }
+
+function msToDuration(ms: number) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  const remainingDays = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  const remainingMinutes = minutes % 60;
+  const remainingSeconds = seconds % 60;
+  const units = [remainingDays, remainingHours, remainingMinutes, remainingSeconds];
+
+  // console.log(`ms: ${ms} → ${remainingDays}d ${remainingHours}h ${remainingMinutes}m ${remainingSeconds}s`);
+
+  // Make sure that only the two most significant non-zero units are shown because, for example,
+  // minutes and seconds do not add much value when days and hours are present, etc.
+  // E.g. "1 day and 3 hours", "2 hours and 15 minutes", "5 minutes and 30 seconds"
+  for (let i = 0; i < units.length - 2; i++) {
+    if (units[i] !== 0 && units[i + 1] !== 0) {
+      // zero out all less significant units
+      for (let j = i + 2; j < units.length; j++) {
+        units[j] = 0;
+      }
+      break;
+    }
+  }
+
+  return {
+    days: units[0],
+    hours: units[1],
+    minutes: units[2],
+    seconds: units[3]
+  };
+}
+
+function createFormattedTimeString(sourceTime: Date, targetTime: Date, locale = 'en'): string {
+  const diffMs = targetTime.getTime() - sourceTime.getTime();
+  const tense = diffMs < 0 ? 'past' : 'future';
+  const absMs = Math.abs(diffMs);
+  const duration = msToDuration(absMs);
+
+  const formatted = formatWithContext(duration, locale, tense);
+
+  // console.log(`now: ${sourceTime.toISOString()}, target: ${targetTime.toISOString()}, diffMs: ${diffMs}, duration:`, duration, `→ formatted: ${formatted}`);
+
+  return formatted;
+}
+
+
+function test() {
+  // 1 day, 2 hours, 30 minutes, 45 seconds ago
+  const now = new Date();
+  const past = new Date(now.getTime() + ((1 * 24 * 60 * 60) + (2 * 60 * 60) + (30 * 60) + 45) * 1000);
+  console.log(createFormattedTimeString(now, past));
+  // 1 hour, 15 minutes from now
+  const future = new Date(now.getTime() + ((1 * 60 * 60) + (15 * 60)) * 1000);
+  console.log(createFormattedTimeString(now, future));
+  // 1 day, 3 hours from now
+  const future2 = new Date(now.getTime() + ((1 * 24 * 60 * 60) + (3 * 60 * 60)) * 1000);
+  console.log(createFormattedTimeString(now, future2));
+  // 1 day, 0 hours, 0 minutes, 5 seconds ago
+  const past2 = new Date(now.getTime() + ((1 * 24 * 60 * 60) + (5)) * 1000);
+  console.log(createFormattedTimeString(now, past2));
+  // 1 day, 4 hours, 0 minutes, 5 seconds ago
+  const past3 = new Date(now.getTime() + ((1 * 24 * 60 * 60) + (4 * 60 * 60) + (5)) * 1000);
+  console.log(createFormattedTimeString(now, past3));
+  // 4 hours, 0 minutes, 5 seconds ago
+  const past4 = new Date(now.getTime() + ((4 * 60 * 60) + (5)) * 1000);
+  console.log(createFormattedTimeString(now, past4));
+  // 4 hours, 5 minutes, 0 seconds ago
+  const past5 = new Date(now.getTime() + ((4 * 60 * 60) + (5 * 60)) * 1000);
+  console.log(createFormattedTimeString(now, past5));
+}
+
 
 // console.log(formatWithContext({ hours: 1, minutes: 30 }, 'en', 'future'));
 // → "in 1 hour and 30 minutes"
