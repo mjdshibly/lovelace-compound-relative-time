@@ -1,19 +1,17 @@
 import { HomeAssistant } from 'custom-card-helpers';
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, noChange } from 'lit';
 import { property, customElement, state } from 'lit/decorators.js';
 import { BoilerplateCardConfig } from './types';
 
 @customElement('compound-relative-time')
-export class CompoundRelativeTime extends LitElement {
-  @property({ type: String }) datetime = '';
-  @property({ type: String }) locale = 'en';
-  @property({ type: String }) icon = '';
-  @property({ type: String }) name = '';
-  @state() private hass!: HomeAssistant;
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export class CompoundRelativeTime extends LitElement
+{
+  private config?: BoilerplateCardConfig;
+  // HA state - assigned by HA every time the state changes
+  hass!: HomeAssistant;
+  // Class properties
   private timer?: number;
-  private entityId?: string;
-  private _config?: BoilerplateCardConfig;
 
   static styles = [
     css`
@@ -85,10 +83,7 @@ export class CompoundRelativeTime extends LitElement {
       throw new Error('You need to define an entity');
     }
 
-    this._config = config;
-    this.entityId = config.entity;
-    this.icon = config.icon ?? '';
-    this.name = config.name ?? '';
+    this.config = config;
   }
 
   public getGridOptions() {
@@ -101,40 +96,28 @@ export class CompoundRelativeTime extends LitElement {
   }
 
   render() {
-    if (!this._config || !this.entityId) {
-      return html`<ha-card><div class="warning">No entity configured</div></ha-card>`;
+    if (!this.config) {
+      return html`<ha-card><div class="warning">Card not configured!</div></ha-card>`;
     }
+
+    // console.log(this.config)
 
     const now = new Date();
-    let valueHtml;
-    let iconToShow = this.icon;
-    let nameToShow = this.name;
-    let entityState;
-    let entityIcon;
-    let entityName;
+    const target = new Date(this.hass.states[this.config.entity].state);
 
-    if (this.hass && this.entityId && this.hass.states[this.entityId]) {
-      entityState = this.hass.states[this.entityId];
-      this.datetime = entityState.state;
-      entityIcon = entityState.attributes.icon;
-      entityName = entityState.attributes.friendly_name;
-      if (!iconToShow && entityIcon) iconToShow = entityIcon;
-      if (!nameToShow && entityName) nameToShow = entityName;
-    }
+    const name = this.config.name ?? this.hass.states[this.config.entity]?.attributes?.friendly_name ?? 'Relative Time';
+    const icon = this.config.icon ?? this.hass.states[this.config.entity]?.attributes?.icon ?? 'mdi:clock-outline';
+    const locale = this.config.locale ?? 'en';
 
-    if (!this.datetime) {
-      valueHtml = html`<span>No datetime provided</span>`;
-    } else {
-      valueHtml = html`<span title="${this.datetime}">${createFormattedTimeString(now, new Date(this.datetime), this.locale)}</span>`;
-    }
+    const timeHtml = html`<span title="${target}">${createFormattedTimeString(now, target, locale)}</span>`;
 
     return html`
       <ha-card>
         <div class="tile-row">
-          <ha-icon class="tile-icon" .icon="${iconToShow || 'mdi:clock-outline'}"></ha-icon>
+          <ha-icon class="tile-icon" .icon="${icon}"></ha-icon>
           <div class="tile-text">
-            <span class="tile-title">${nameToShow || 'Relative Time'}</span>
-            <span class="tile-content">${valueHtml}</span>
+            <span class="tile-title">${name}</span>
+            <span class="tile-content">${timeHtml}</span>
           </div>
         </div>
       </ha-card>
@@ -143,12 +126,13 @@ export class CompoundRelativeTime extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    // this.timer = window.setInterval(() => this.requestUpdate(), 10000); // update every minute
+    this.timer = window.setInterval(() => this.requestUpdate(), 1000);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    // if (this.timer) clearInterval(this.timer);
+    if (this.timer)
+      clearInterval(this.timer);
   }
 }
 
@@ -279,6 +263,7 @@ function createFormattedTimeString(sourceTime: Date, targetTime: Date, locale = 
 }
 
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function test() {
   // 1 day, 2 hours, 30 minutes, 45 seconds ago
   const now = new Date();

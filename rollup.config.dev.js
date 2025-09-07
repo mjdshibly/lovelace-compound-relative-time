@@ -14,8 +14,8 @@ function scpAfterBuild() {
   return {
     name: 'scp-after-build',
     writeBundle() {
-      const localFile = './dist/compound-relative-time.js';
-      const remotePath = '/root/homeassistant/www/compound-relative-time.js';
+      const localFile = './dist/*';
+      const remotePath = '/root/homeassistant/www/';
       const scpCmd = `scp ${localFile} ha:${remotePath}`;
       exec(scpCmd, (err, stdout, stderr) => {
         if (err) {
@@ -33,6 +33,7 @@ export default {
   output: {
     dir: './dist',
     format: 'es',
+    sourcemap: true, // Enable source maps for debugging
   },
   plugins: [
     resolve(),
@@ -40,8 +41,10 @@ export default {
     json(),
     babel({
       exclude: 'node_modules/**',
+      sourceMaps: true, // Enable Babel source maps
     }),
-    terser(),
+    // Comment out terser for easier debugging (no minification)
+    // terser(),
     serve({
       contentBase: './dist',
       host: '0.0.0.0',
