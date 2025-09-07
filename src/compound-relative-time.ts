@@ -1,7 +1,10 @@
-import { HomeAssistant } from 'custom-card-helpers';
+import { ActionHandlerEvent, handleAction, hasAction, HomeAssistant } from 'custom-card-helpers';
 import { LitElement, html, css, noChange } from 'lit';
 import { property, customElement, state } from 'lit/decorators.js';
 import { BoilerplateCardConfig } from './types';
+import { mdiGestureTap } from "@mdi/js";
+import { actionHandler } from './action-handler-directive';
+import { ifDefined } from "lit/directives/if-defined";
 
 @customElement('compound-relative-time')
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -22,20 +25,10 @@ export class CompoundRelativeTime extends LitElement
                 max-width: 400px;
                 margin: var(--tile-card-margin);
             }
-            ha-card {
-                display: flex;
-                flex-direction: column;
-                padding: 10px;
-                box-sizing: border-box;
-                background: var(--card-background-color, white);
-                color: var(--primary-text-color, #212121);
-                border-radius: var(--ha-card-border-radius, 12px);
-                box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
-                width: 100%;
-            }
             .tile-row {
                 display: flex;
                 align-items: center;
+                padding: 10px;
             }
             .tile-icon {
                 font-size: 14px;
@@ -64,6 +57,13 @@ export class CompoundRelativeTime extends LitElement
                 font-size: 1em;
                 margin-top: 8px;
             }
+            [role="button"] {
+                cursor: pointer;
+                pointer-events: auto;
+            }
+                [role="button"]:focus {
+                outline: none;
+            }
         `,
     ];
 
@@ -75,6 +75,23 @@ export class CompoundRelativeTime extends LitElement
                 { name: 'name', selector: { text: {} } },
                 { name: 'icon', selector: { icon: {} } },
                 { name: 'locale', selector: { text: {} } },
+                {
+                    name: "interactions",
+                    type: "expandable",
+                    flatten: true,
+                    iconPath: mdiGestureTap,
+                    schema: [
+                        {
+                            name: "tap_action",
+                            selector: {
+                                ui_action: {
+                                    default_action: "more-info", // Has to be stay this way to match the built in default of imported action handling functions.
+                                    actions: [ "more-info", "toggle", "call-service", "navigate", "url", "none" ],
+                                },
+                            },
+                        },
+                    ],
+                },
             ],
         };
     }
@@ -85,7 +102,17 @@ export class CompoundRelativeTime extends LitElement
             throw new Error('You need to define an entity');
         }
 
-        this.config = config;
+        // console.log(config);
+
+        this.config = {
+            // tap_action must always be defined for imported action handling functions to work.
+            // Those function have a default tap_action of "more-info" built in them.
+            // The user needs to explicitly set tap_action to "none" to disable it.
+            tap_action: {
+                action: "more-info",
+            },
+            ...config,
+        };
     }
 
     public getGridOptions()
@@ -126,19 +153,45 @@ export class CompoundRelativeTime extends LitElement
         const icon = this.config.icon ?? this.hass.states[ this.config.entity ]?.attributes?.icon ?? 'mdi:clock-outline';
         const locale = this.config.locale ?? 'en';
 
-        const timeHtml = html`<span title="${target}">${createFormattedTimeString(now, target, locale)}</span>`;
-
         return html`
-            <ha-card>
+            <!-- Action handling is magic copied from HA's src/panels/lovelace/cards/hui-tile-card.ts -->
+            <!-- Template guy just copied actionHandler from HA's source -->
+            <ha-card
+                @action=${this.handleAction}
+                .actionHandler=${actionHandler({
+                    hasHold: hasAction(this.config.hold_action),
+                    hasDoubleClick: hasAction(this.config.double_tap_action),
+                })}
+                role=${ifDefined(this.hasCardAction ? "button" : undefined)}
+                tabindex=${ifDefined(this.hasCardAction ? "0" : undefined)}
+            >
+                <ha-ripple .disabled=${!this.hasCardAction}></ha-ripple>
                 <div class="tile-row">
                     <ha-icon class="tile-icon" .icon="${icon}"></ha-icon>
                     <div class="tile-text">
                         <span class="tile-title">${name}</span>
-                        <span class="tile-content">${timeHtml}</span>
+                        <span class="tile-content">${createFormattedTimeString(now, target, locale)}</span>
                     </div>
                 </div>
             </ha-card>
         `;
+    }
+
+    private get hasCardAction() {
+        const res = (
+            !this.config?.tap_action ||
+            hasAction(this.config?.tap_action) ||
+            hasAction(this.config?.hold_action) ||
+            hasAction(this.config?.double_tap_action)
+        );
+        return res;
+    }
+
+    private handleAction(ev: ActionHandlerEvent): void
+    {
+        if (this.hass && this.config && ev.detail.action) {
+            handleAction(this, this.hass, this.config, ev.detail.action);
+        }
     }
 }
 
