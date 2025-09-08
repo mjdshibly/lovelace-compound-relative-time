@@ -1,5 +1,5 @@
 // Include your formatter functions here: formatWithContext, formatCompoundDuration, getLocalizedUnit, getArabicUnit
-function formatCompoundDuration(duration, locale = 'en')
+function formatCompoundDuration(duration, locale = 'en', compact = false)
 {
     const units = [ 'days', 'hours', 'minutes', 'seconds' ];
     const numberFormatter = new Intl.NumberFormat(locale);
@@ -16,7 +16,7 @@ function formatCompoundDuration(duration, locale = 'en')
         .map((unit) =>
         {
             const value = duration[ unit ];
-            const label = getLocalizedUnit(unit, value, locale);
+            const label = getLocalizedUnit(unit, value, locale, compact);
             return `${numberFormatter.format(value)} ${label}`;
         });
 
@@ -33,18 +33,19 @@ function formatCompoundDuration(duration, locale = 'en')
     }
 }
 
-function getLocalizedUnit(unit, value, locale)
+function getLocalizedUnit(unit, value, locale, compact = false)
 {
     if (locale === 'ar') {
-        return getArabicUnit(unit, value);
+        const label = getArabicUnit(unit, value);
+        return compact ? label[0] : label;
     }
 
     const labels = {
         en: {
-            days: [ 'd', 'd' ],
-            hours: [ 'h', 'h' ],
-            minutes: [ 'm', 'm' ],
-            seconds: [ 's', 's' ],
+            days: [ 'day', 'days' ],
+            hours: [ 'hour', 'hours' ],
+            minutes: [ 'minute', 'minutes' ],
+            seconds: [ 'second', 'seconds' ],
         },
         nl: {
             days: [ 'dag', 'dagen' ],
@@ -55,7 +56,8 @@ function getLocalizedUnit(unit, value, locale)
     };
 
     const [ singular, plural ] = labels[ locale ]?.[ unit ] || [ unit, unit + 's' ];
-    return value === 1 ? singular : plural;
+    const label = value === 1 ? singular : plural;
+    return compact ? label[0] : label;
 }
 
 function getArabicUnit(unit, value)
@@ -72,9 +74,9 @@ function getArabicUnit(unit, value)
     return forms[ unit ].plural;
 }
 
-function formatWithContext(duration, locale = 'en', tense = 'past')
+function formatWithContext(duration, locale = 'en', tense = 'past', compact = false)
 {
-    const phrase = formatCompoundDuration(duration, locale);
+    const phrase = formatCompoundDuration(duration, locale, compact);
     if (locale === 'en') {
         return tense === 'past' ? `${phrase} ago` : `In ${phrase}`;
     } else if (locale === 'nl') {
@@ -120,14 +122,14 @@ function msToDuration(ms: number)
     };
 }
 
-export function createCompoundRelativeTimeString(sourceTime: Date, targetTime: Date, locale = 'en'): string
+export function createCompoundRelativeTimeString(sourceTime: Date, targetTime: Date, locale = 'en', compact = false): string
 {
     const diffMs = targetTime.getTime() - sourceTime.getTime();
     const tense = diffMs < 0 ? 'past' : 'future';
     const absMs = Math.abs(diffMs);
     const duration = msToDuration(absMs);
 
-    const formatted = formatWithContext(duration, locale, tense);
+    const formatted = formatWithContext(duration, locale, tense, compact);
 
     // console.log(`now: ${sourceTime.toISOString()}, target: ${targetTime.toISOString()}, diffMs: ${diffMs}, duration:`, duration, `→ formatted: ${formatted}`);
 

@@ -42,16 +42,27 @@ export class CompoundRelativeTime extends LitElement
                 flex-direction: column;
                 justify-content: center;
                 flex: 1;
+
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
             }
             .tile-title {
                 font-size: 1.1em;
                 font-weight: 500;
                 line-height: 1.2;
+
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
             }
             .tile-content {
                 font-size: 0.9em;
                 line-height: 1.2;
-                word-break: break-word;
+
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
             }
             .warning {
                 color: var(--error-color, #b71c1c);
@@ -154,6 +165,11 @@ export class CompoundRelativeTime extends LitElement
         const icon = this.config.icon ?? this.hass.states[ this.config.entity ]?.attributes?.icon ?? 'mdi:clock-outline';
         const locale = this.config.locale ?? 'en';
 
+
+        const fullTimeString = createCompoundRelativeTimeString(now, target, locale);
+
+        // Check if the string is too long to fit in the card nicely.
+
         return html`
             <!-- Action handling is magic copied from HA's src/panels/lovelace/cards/hui-tile-card.ts -->
             <!-- Template guy just copied actionHandler from HA's source -->
@@ -171,7 +187,7 @@ export class CompoundRelativeTime extends LitElement
                     <ha-icon class="tile-icon" .icon="${icon}"></ha-icon>
                     <div class="tile-text">
                         <span class="tile-title">${name}</span>
-                        <span class="tile-content">${createCompoundRelativeTimeString(now, target, locale)}</span>
+                        <span class="tile-content">${fullTimeString}</span>
                     </div>
                 </div>
             </ha-card>
